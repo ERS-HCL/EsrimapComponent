@@ -1,0 +1,17 @@
+# Ignore Node & Typings
+###################
+bower_components
+node_modules
+build
+.tmp
+.bowerrc
+src/**/*.map
+typings
+report
+dist
+help
+
+# Ignore Test reporters
+###################
+**/test/coverage
+reports

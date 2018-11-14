@@ -1,0 +1,7 @@
+{
+  "name": "esrimap-comp",
+  "short_name": "esrimap-comp",
+  "description": "esrimap component",
+  "start_url": "/",
+  "display": "standalone"
+}

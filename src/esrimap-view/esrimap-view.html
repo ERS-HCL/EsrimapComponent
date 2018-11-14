@@ -1,0 +1,639 @@
+<polymer-element id="esrimap-view">
+    <script>
+    /**
+    * @customElement
+    * @polymer
+    */
+
+    class EsrimapView extends Polymer.Element {
+        static get is() { return 'esrimap-view'; }
+        constructor() {
+            super();
+            this.map = null;
+            this.simpleMarkerSymbol = null;
+            this.simpleLineSymbol = null;
+            this.color = null;
+            this.point = null;
+            this.graphic = null;
+            this.graphicsLayer = null;
+            this.textSymbol = null;
+            this.pictureMarkerSymbol = null;
+            this.graphicsLayer = null;
+            this.layerInfo = null;
+            this.layerArray = null;
+            this.legendLayers = null;
+            // this.zoomLevel = null;
+            this.searchList = null;
+            this.arrayUtils = null;
+            this.CheckBox = null;
+            this.utils = null;
+            this.dom = null;
+            this.domConstruct = null;
+            this.geocoder = null;
+            this.toolTipOrder = null;
+            this.customTooltip = null;
+            this.nestedTooltipDetails = null;
+            this.layerKeyInfo = null;
+            this.SpatialReference = null;
+            this.webMercatorUtils = null;
+            this.popupTemplate = null;
+            this.classBreaksRenderer = null;
+            this.ClusterLayer = null;
+            this.photoInfo = null;
+            this.clusterForLayer = null;
+            this.isClusteringNeeded = false;
+            this.isClusterInitialized = false;
+            this.esrimapmarkerurl = null;
+        }
+
+        /**
+         *  Make the api calls to Get the data for summary view chart and form the series data which one is accepatable by highcharts.
+         */
+        connectedCallback() {
+            super.connectedCallback();
+            this.innerHTML = `<style>
+                                    html, body, #map {padding:0; margin:0; height:100%;}
+                                    #BasemapToggle { position: absolute; bottom:30px; right: 10px; z-index: 10; }
+                                    #search {
+                                            position: absolute;
+                                            z-index: 35;
+                                            right: 10px;
+                                            top: 25px;
+                                    }
+                                    .legend-holder {
+                                        position: absolute;
+                                        z-index: 35;
+                                        background-color: black;
+                                        margin: 5px;
+                                        opacity: 0.75;
+                                        color: white;
+                                        padding: 0px 5px 0px 10px;
+                                        max-width: 85%;
+                                        bottom: 30px;
+                                    }
+                                    .dijitCheckBoxInput {
+                                        opacity:1;
+                                    }
+                                </style>
+                <div id="mapDiv" style="height:100%;width:100%;"><div id="mapLegend"  class="legend-holder layers-add-result"><div id="toggle" > </div></div><div id="search"> </div><div class="BasemapToggle" role="presentation" style="display: block;" id="BasemapToggle"></div></div>`;
+                var _map;
+            // Listen the dispatched event from esrimap data element and generate the esrimap component
+            window.addEventListener('esrimapdata', (event) => {        
+            if (!_map) {
+                
+                require([
+
+                    "esri/arcgis/utils", "esri/dijit/Legend", "dojo/dom", "dojo/dom-construct", "dijit/form/CheckBox",
+                "dojo/parser",
+                "dojo/ready",
+                "dojo/_base/array",
+                "esri/Color",
+                "dojo/dom-style",
+                "dojo/query",
+
+                "esri/map",
+                "esri/request",
+                "esri/graphic",
+                "esri/geometry/Extent",
+                "esri/dijit/Search",
+
+                "esri/symbols/SimpleMarkerSymbol",
+                "esri/symbols/SimpleLineSymbol",
+                "esri/symbols/SimpleFillSymbol",
+                "esri/symbols/PictureMarkerSymbol",
+                "esri/renderers/ClassBreaksRenderer",
+                "esri/layers/GraphicsLayer",
+                "esri/symbols/TextSymbol",
+                'esri/basemaps',
+                "esri/dijit/BasemapToggle",
+                "esri/SpatialReference",
+                "esri/dijit/PopupTemplate",
+                "esri/geometry/Point",
+                "esri/geometry/webMercatorUtils",
+                "esri/tasks/QueryTask",
+                "esri/tasks/query",
+
+                "esri/dijit/Geocoder",
+                "dijit/layout/BorderContainer",
+                "dijit/layout/ContentPane",
+
+                "dojo/domReady!"
+                ], (utils, Legend, dom, domConstruct, CheckBox, parser, ready, arrayUtils, Color, domStyle, query,
+                Map, esriRequest, Graphic, Extent, Search,
+                SimpleMarkerSymbol, SimpleLineSymbol, SimpleFillSymbol, PictureMarkerSymbol, ClassBreaksRenderer,
+                GraphicsLayer, TextSymbol, esriBasemaps, BasemapToggle, SpatialReference, PopupTemplate, Point, webMercatorUtils,
+                QueryTask, Query,  Geocoder) => {
+                        this.simpleMarkerSymbol = SimpleMarkerSymbol;
+                        this.SpatialReference = SpatialReference;
+                        this.webMercatorUtils = webMercatorUtils;
+                        this.classBreaksRenderer = ClassBreaksRenderer;
+                        this.popupTemplate = PopupTemplate;
+                        this.simpleLineSymbol = SimpleLineSymbol;
+                        this.esriBasemaps = esriBasemaps;
+                        this.color = Color;
+                        this.geocoder = Geocoder;
+                        this.search = Search;
+                        this.point = Point;
+                        this.graphic = Graphic;
+                        this.textSymbol = TextSymbol;
+                        this.pictureMarkerSymbol = PictureMarkerSymbol;
+                        this.graphicsLayer = GraphicsLayer;
+                        var layerInfo;
+                        var searchList;
+                        var _local = this;
+                        this.arrayUtils = arrayUtils;
+                        this.CheckBox = CheckBox;
+                        this.utils = utils;
+                        this.dom = dom;
+                        this.domConstruct = domConstruct;
+                        this.legendLayers = [];
+                        this.layerArray = {};
+                        this.clusterForLayer;
+                        this.layerKeyInfo = this.getAttribute("layer-info-key");
+                        this.customTooltip = this.getAttribute("nested-tooltip");
+                        this.nestedTooltipDetails = this.getAttribute("nested-tooltip-key");
+                        this.isClusteringNeeded = this.getAttribute("is-clustering-needed");
+                        const center = [-122.45, 37.75];
+                        this.zoomLevel = 16;
+                        const basemap = "hybrid";
+                        this.tooltiptitle=this.getAttribute("tooltiptitle");
+                        if (this.getAttribute("layer-info") != "{{vm.commonServices.layerInfo}}") {
+                            this.tooltiptitle=this.getAttribute("tooltiptitle");
+                            searchList = event.detail.mapData;
+                            layerInfo = event.detail.layerInfo;
+                            this.esrimapmarkerurl = event.detail.esrimapmarkerurl;
+                            this.layerInfo = layerInfo;
+                            this.searchList = searchList;
+                            this.toolTipOrder = JSON.parse('{   "name": "Serial Number", "latitude": "Latititude", "longitude": "Longitude"}');   
+                        }
+                        this.map = new Map(this.children[1], {
+                            basemap: basemap,  //For full list of pre-defined basemaps, navigate to http://arcg.is/1JVo6Wd
+                            center: center, // longitude, latitude
+                            zoom: this.zoomLevel
+                        });
+
+                        //For Satelite View redraw .
+
+                        var toggleBase = dijit.byId("BasemapToggle");
+                        if (toggleBase) {
+                            toggleBase.destroy();
+                            toggleBase = null;
+                        }
+
+                        //On changing basemap type to hybrid
+                        toggleBase = new BasemapToggle({
+                            map: this.map,
+                            basemap: "streets",
+                            basemaps: {
+                                "streets": {
+                                    "title": "Streets",
+                                    "thumbnailUrl": "https://js.arcgis.com/3.16/esri/images/basemap/streets.jpg"
+                                },
+                                "hybrid": {
+                                    "title": "Satellite",
+                                    "thumbnailUrl": "https://js.arcgis.com/3.21/esri/images/basemap/satellite.jpg"
+                                }
+                            }
+
+                        }, "BasemapToggle");
+                        toggleBase.startup();
+
+                        //to redraw search withou id existing issue!
+                        this.searchBox = dijit.byId("search");
+                        if (this.searchBox) {
+                            this.searchBox.destroy();
+                            this.searchBox = null;
+                        }
+                        
+                    this.searchBox = new this.search({
+                            map: this.map
+                        }, "search");
+                        this.searchBox.startup();
+
+
+                        _map = this.map;
+                        // this.zoomLevel = 3;
+                        
+                        if(layerInfo){
+                            this.createLayers(layerInfo);
+                        }
+                        
+
+                        this.map.on("mapLegend", function () {
+                            var legend = new Legend({
+                                map: this.children[1],
+                                layerInfos: _local.legendLayers
+                            }, "mapLegend");
+                            legend.startup();
+                        });
+                        this.createLegends();
+
+                        if (this.layerInfo != null && this.map && searchList.length > 0 && !this.isClusteringNeeded) {
+                            this.addGraphicPins(searchList, "", false);
+                            var coords = {
+                                "latitude": searchList[0].latitude,
+                                "longitude": searchList[0].longitude
+                            };
+                            this.zoomToSelectedLocation(coords, this.zoomLevel);
+                        }
+                        else if (this.layerInfo != null && this.map && searchList.length > 0 && this.isClusteringNeeded && !this.isClusterInitialized) {
+                            this.addClusters(searchList);
+                            this.createLegends();
+                            var coords = {
+                                "latitude": searchList[0].latitude,
+                                "longitude": searchList[0].longitude
+                            };
+                            this.zoomToSelectedLocation(coords, this.zoomLevel);
+
+                        }
+
+                        else
+                            this.zoomToCurrentLocation(this.map, this.zoomLevel);
+
+                        this.map.on("click", (evt) => {
+                            _local.zoomLevel = _local.map.getLevel();
+                            if (!_local.isClusteringNeeded && (!!evt.graphic && !!evt.graphic.attributes.name)) {
+                                _local.showInfoWindow(evt, {});
+                            }
+                            else {
+
+                            }
+                        });
+                    });
+            }
+            });
+            
+        }
+
+        ready() {
+            super.ready();
+        }
+
+        createSymbol(imageurl, width, height) {
+            var symbol = new this.pictureMarkerSymbol({
+                "url": imageurl,
+                "width": width,
+                "height": height
+            });
+            return symbol;
+        }
+        addGraphicPins(searchList, graphicImage, labelFlag, width, height) {
+            var _local = this;
+
+            for (var i = 0; i < Object.keys(this.layerArray).length; i++) {
+                var layer = Object.keys(this.layerArray)[i];
+                var value = this.layerArray[layer];
+                var gl = _local.map.getLayer(layer);
+                gl.clear();
+            }
+
+            //  gl.setVisibility(false);
+            //  this.map.getLayer("mapGraphic").getLayer.clear();
+            width = width == undefined ? 28 : width;
+            height = height == undefined ? 28 : height;
+            if (!graphicImage) {
+
+                var picBaseUrl = "https://static.arcgis.com/images/Symbols/Shapes/";
+                var graphicImage = new this.pictureMarkerSymbol(picBaseUrl + "BluePin1LargeB.png", 50, 50).setOffset(0, 15);
+            }
+
+            if (this.searchList) {
+                for (var i = 0; i < this.searchList.length; i++) {
+                    if (this.searchList[i].latitude && this.layerArray[this.searchList[i].name] != undefined) {
+                    //if (this.searchList[i].latitude ) {
+                        // var symbol = this.createSymbol(graphicImage, width, height);
+                        var imageUrl = (this.esrimapmarkerurl)?this.esrimapmarkerurl:"./src/images/marker-32.png";
+                        var symbol = new esri.symbol.PictureMarkerSymbol(imageUrl, 32, 32);
+                        //var colorHex = this.color.fromHex((this.searchList[i].color)?this.searchList[i].color: '#F6F901');
+                        //symbol.setColor(colorHex);
+                        /*var symbol = new this.simpleMarkerSymbol({
+                            "color": new _local.color((this.searchList[i].color)?this.searchList[i].color: '#F6F901'),
+                            "size": 6,
+                            "angle": -30,
+                            "xoffset": 0,
+                            "yoffset": 0,
+                            "type": "esriSMS",
+                            "style": "esriSMSCircle",
+                            "outline": {
+                                "color": new _local.color((this.searchList[i].color)?this.searchList[i].color: '#F6F901'),
+                                "width": 1,
+                                "type": "esriSLS",
+                                "style": "esriSLSSolid"
+                            }
+                        });*/
+                        let point = new this.point(this.searchList[i].longitude, this.searchList[i].latitude);
+                        this.layerArray[this.searchList[i].name].add(new this.graphic(point, symbol, this.searchList[i]));
+                        _local.map.getLayer(this.searchList[i].name).add(new this.graphic(point, symbol, this.searchList[i]));
+                        if (labelFlag) {
+                            var labelSymbol = this.textSymbol(this.searchList[i].name).setFont(
+                                new esri.symbol.Font("12pt").setWeight(esri.symbol.Font.WEIGHT_BOLD));
+                            labelSymbol.setOffset(0, -23);
+                            this.layerArray[this.searchList[i].name].add(new this.graphic(point, labelSymbol, this.searchList[i]));
+                        }
+                    }
+                }
+            }
+
+        }
+        zoomToCurrentLocation(map, zoomLevel) {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (location) => {
+                        zoomLevel = zoomLevel == undefined ? 7 : zoomLevel;
+                        let pt = this.point(location.coords.longitude, location.coords.latitude);
+                        // map.centerAt(pt);
+                        map.centerAndZoom(pt, zoomLevel);
+
+                    });
+
+            }
+        }
+
+        zoomToSelectedLocation(coords, zoomLevel) {
+            zoomLevel = zoomLevel == undefined ? 7 : zoomLevel;
+            let pt = this.point(coords.longitude, coords.latitude);
+            // this.map.centerAt(pt);
+            this.map.centerAndZoom(pt, zoomLevel);
+        }
+
+        showInfoWindow(evt, clickedData) {
+            var infoData = "";
+            if (evt.graphic != undefined) {
+                this.map.infoWindow.setTitle(this.tooltiptitle);
+                this.map.infoWindow.resize(286, 200);
+                for (var i = 0; i < this.searchList.length; i++) {
+                    if (this.searchList[i].latitude == evt.graphic.attributes.latitude && this.searchList[i].longitude == evt.graphic.attributes.longitude && this.map.getLayer(this.searchList[i].name).visible == true)
+                        if (this.customTooltip) {
+                            for (var j = 0; j < Object.values(this.searchList[i][this.nestedTooltipDetails]).length; j++) {
+                                infoData = infoData + this.getContent(Object.values(this.searchList[i][this.nestedTooltipDetails])[j], Object.values(this.searchList[i][this.nestedTooltipDetails]).length);
+                            }
+                        }
+                        else
+                            infoData = infoData + this.getContent(this.searchList[i], this.searchList.length);
+                }
+                this.map.infoWindow.setContent(infoData);
+                
+                // this.map.infoWindow.setContent("lat/lon : " + evt.graphic.attributes.latitude.toFixed(2) + ", " + evt.graphic.attributes.longitude.toFixed(2));
+                this.map.infoWindow.show(evt.mapPoint, this.map.getInfoWindowAnchor(evt.screenPoint));
+                // var gl = this.map.getLayer(evt.graphic.attributes.name);
+                // gl.setVisibility(false);
+
+            }
+
+
+        }
+
+        getContent(data, length) {
+
+            var temp = "";
+            for (var i = 0; i < Object.keys(this.toolTipOrder).length; i++) {
+                var key = Object.keys(this.toolTipOrder)[i];
+                var value = this.toolTipOrder[key];
+                temp = temp + "<b>" + value + " : </b>" + data[key] + "<br>";
+            }
+            if (length > 1)
+                temp = temp + "<br>----------------------------------------------<br>"
+            //    var temp = "<b>Segment Name : </b>" + data.name +
+            //             "<br><b>Cycle Name : </b>" + data.cycleName +
+            //         "<br><b>Latititude : </b>" + data.latitude +
+            //         "<br><b>Longitude : </b>" + data.longitude +
+            //          "<br><b>Fuel : </b>" + data.fuel +
+            //             "<br><b>Payload : </b>" + data.payload +
+            //         "<br><b>Duration : </b>" + data.duration +
+            //         "<br><b>Start Time : </b>" + data.startTime +
+            //         "<br><b>End Time : </b>" + data.endTime;
+            //         if(length>1)
+            //         temp=temp+"<br>----------------------------------------------<br>"
+            return temp;
+
+        }
+
+        static get observedAttributes() {
+            return ["basemap", "search-list", "layer-info", "tool-tip-order"];
+        }
+
+        attributeChangedCallback(name, oldValue, newValue) {
+            if (oldValue != null && this.map) {
+                // if (oldValue !== newValue) {
+                this.tooltiptitle = this.getAttribute("tooltiptitle");
+                this.layerKeyInfo = this.getAttribute("layer-info-key");
+                this.customTooltip = this.getAttribute("nested-tooltip");
+                this.nestedTooltipDetails = this.getAttribute("nested-tooltip-key");
+                switch (name) {
+                    case "basemap":
+                        this.map._basemap = newValue;
+
+                        break;
+                    case "search-list":
+
+                        this.searchList = JSON.parse(newValue);
+                        break;
+                    case "layer-info":
+
+                        this.layerInfo = JSON.parse(newValue);
+
+                        break;
+                    case "tool-tip-order":
+                        this.toolTipOrder = JSON.parse(newValue);
+                        break;
+                }
+                // }
+                const searchList = this.searchList;
+                this.searchBox.clear();
+                if (this.layerInfo != null) {
+                    this.createLayers(this.layerInfo);
+                    if (!this.isClusteringNeeded)
+                        this.addGraphicPins(searchList, "", false);
+                    this.createLegends();
+                    if (searchList.length > 0) {
+                        var coords = {};
+                        for (var i = 0; i < searchList.length; i++) {
+                            if (searchList[i].latitude != 90 && searchList[i].latitude != 0) {
+                                coords = {
+                                    "latitude": searchList[i].latitude,
+                                    "longitude": searchList[i].longitude
+                                }; break;
+                            }
+                        }
+                        if (!this.isClusteringNeeded)
+                            this.addGraphicPins(searchList, "", false);
+                        else if (name == "tool-tip-order" && this.isClusteringNeeded && !this.isClusterInitialized) {
+                            this.addClusters(searchList);
+                            this.createLegends();
+                            this.zoomToSelectedLocation(coords, this.zoomLevel);
+                        }
+                        // if (coords == undefined)
+                        //     this.zoomToCurrentLocation(this.map, this.zoomLevel);
+                        // else
+                        //     this.zoomToSelectedLocation(coords, this.zoomLevel);
+
+                    }
+
+                }
+            }
+
+        }
+
+        createLayers(layerInfo) {
+            var _local = this;
+            _local.legendLayers = [];
+            _local.map.infoWindow.hide();
+            _local.layerInfo = layerInfo;
+            console.log("layerInfo in " + layerInfo);
+
+            for (var i = 0; i < Object.keys(_local.layerInfo).length; i++) {
+                var layer = Object.keys(_local.layerInfo)[i];
+                var value = _local.layerInfo[layer];
+                if (_local.layerArray == undefined) {
+                    _local.layerArray = [];
+                }
+                if (_local.layerArray[layer] == undefined) {
+
+                    _local.layerArray[layer] = new _local.graphicsLayer({ id: layer });
+                }
+
+                _local.legendLayers.push({ layer: _local.layerArray[layer], title: layer, color: value });
+                _local.map.addLayer(_local.layerArray[layer]);
+
+
+            }
+        }
+        createLegends() {
+            var _local = this;
+            // this.map.on('mapLegend', function () {
+            // add check boxes
+            //_local.children[2].children[0].innerHTML = `<div id="toggle" ></div>`;
+            _local.arrayUtils.forEach(_local.legendLayers, function (layer) {
+                var layerColor = layer.color;
+                var layerName = layer.title;
+                var checkBox = new _local.CheckBox({
+                    style: 'background-color:' + layerColor + '; border: 2px solid' + layerColor + ' !important;',
+                    class: "checkbox-style",
+                    name: layer.layer.id,
+                    value: layer.layer.id,
+                    checked: layer.layer.visible
+                });
+
+                checkBox.on("change", function () {
+                    var targetLayer = _local.map.getLayer(this.value);
+                    targetLayer.setVisibility(!targetLayer.visible);
+                    //_local.clusterForLayer._layerCluster();
+                    this.checked = targetLayer.visible;
+                    _local.map.infoWindow.hide();
+                });
+
+                //add the check box and label to the toc
+                _local.domConstruct.place(checkBox.domNode,_local.dom.byId("toggle"), "after");
+                var checkLabel = _local.domConstruct.create('label', {
+                    'class': 'legendLabel',
+                    'for': checkBox.name,
+                    innerHTML: layerName
+                }, checkBox.domNode, "after");
+                _local.domConstruct.place("<span></span>", checkLabel, "after");
+            });
+            // });
+
+        }
+        addClusters(resp) {
+            this.isClusterInitialized = true;
+            this.photoInfo = {};
+            var _local = this;
+            var wgs = new this.SpatialReference({
+                "wkid": 4326
+            });
+            this.map.setExtent(this.map.getLayer(this.map.layerIds[0]).initialExtent);
+            this.photoInfo.data = this.arrayUtils.map(resp, function (p) {
+                var symbol = new _local.simpleMarkerSymbol({
+                    "color": new _local.color(p.color),
+                    "size": 12,
+                    "angle": -30,
+                    "xoffset": 0,
+                    "yoffset": 0,
+                    "type": "esriSMS",
+                    "style": "esriSMSCircle",
+                    "outline": {
+                        "color": new _local.color(p.color),
+                        "width": 1,
+                        "type": "esriSLS",
+                        "style": "esriSLSSolid"
+                    }
+                });
+                var latlng = new _local.point(parseFloat(p.longitude), parseFloat(p.latitude), wgs);
+                var webMercator = _local.webMercatorUtils.geographicToWebMercator(latlng);
+                var attributes = {};
+                for (var i = 0; i < Object.keys(p).length; i++) {
+
+                    attributes[Object.keys(p)[i]] = Object.values(p)[i];
+                }
+                // var attributes = {
+                //     "name": p.name,
+                //     "color": p.color,
+                //     "latitude": p.latitude,
+                //     "longitude": p.longitude
+                // };
+                return {
+                    "x": webMercator.x,
+                    "y": webMercator.y,
+                    "attributes": attributes
+
+                };
+            });
+            var popupMessage = [];
+            for (var i = 0; i < Object.keys(this.toolTipOrder).length; i++) {
+                var temp = {
+                    "fieldName": Object.keys(this.toolTipOrder)[i],
+                    "label": Object.values(this.toolTipOrder)[i],
+                    visible: true
+                };
+                popupMessage.push(temp);
+
+            }
+
+            var popupTemplate = new this.popupTemplate({
+                "title": "",
+                "fieldInfos": popupMessage
+            });
+
+            _local.clusterForLayer = new _local.ClusterLayer({
+                "data": _local.photoInfo.data,
+                "distance": 70,
+                "id": "clusters",
+                "labelColor": "#fff",
+                "labelOffset": 10,
+                "resolution": _local.map.extent.getWidth() / _local.map.width,
+                "singleColor": "#888",
+                "singleTemplate": popupTemplate,
+                "layerArray": _local.layerArray
+            });
+            var defaultSym = new this.simpleMarkerSymbol().setSize(4);
+            var renderer = new this.classBreaksRenderer(defaultSym, "clusterCount");
+
+            var picBaseUrl = "https://static.arcgis.com/images/Symbols/Shapes/";
+            var single = new this.simpleMarkerSymbol('circle', 16,
+                new this.simpleLineSymbol(this.simpleLineSymbol.STYLE_SOLID, new this.color([85, 125, 140, 1]), 3),
+                new this.color([255, 255, 255, .5]));
+            var blue = new this.simpleMarkerSymbol('circle', 25,
+                new this.simpleLineSymbol(this.simpleLineSymbol.STYLE_SOLID, new this.color([140, 177, 210, 0.35]), 15),
+                new this.color([140, 177, 210, 0.75]));
+            // new this.pictureMarkerSymbol(picBaseUrl + "BluePin1LargeB.png", 32, 32).setOffset(0, 15);
+            var green = new this.simpleMarkerSymbol('circle', 50,
+                new this.simpleLineSymbol(this.simpleLineSymbol.STYLE_SOLID, new this.color([97, 147, 179, 0.35]), 15),
+                new this.color([97, 147, 179, 0.75]));
+            // new this.pictureMarkerSymbol(picBaseUrl + "GreenPin1LargeB.png", 64, 64).setOffset(0, 15);
+            var red = new this.simpleMarkerSymbol('circle', 110,
+                new this.simpleLineSymbol(this.simpleLineSymbol.STYLE_SOLID, new this.color([20, 72, 77, 0.35]), 15),
+                new this.color([20, 72, 77, 0.75]));
+            // new this.pictureMarkerSymbol(picBaseUrl + "RedPin1LargeB.png", 72, 72).setOffset(0, 15);
+
+            // renderer.addBreak(0, 1, single);
+            renderer.addBreak(0, 10000, blue);
+            // renderer.addBreak(10, 200, green);
+            // renderer.addBreak(200, 1001);
+            _local.clusterForLayer.setRenderer(renderer);
+            _local.map.addLayer(_local.clusterForLayer);
+        }
+    }
+
+    window.customElements.define(EsrimapView.is, EsrimapView);
+    </script>
+</polymer-element>
